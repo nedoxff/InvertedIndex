@@ -15,6 +15,7 @@ from collections import defaultdict
 import json
 import os
 import string
+import itertools
 
 
 class InvertedIndex:
@@ -39,21 +40,33 @@ class InvertedIndex:
         with open(filepath, "w") as file:
             json.dump(result, file, indent=4)
 
-    # Search for words in words_invertex_index.
-    def query(self, words: [str]) -> [int]:
-        for word in words:
-            if word not in self.words_inverted_index:
-                raise Exception("Word '" + word + "' does not exist in the dictionary!")
-        indexes = [self.words_inverted_index[word] for word in words]
-        found = []
-        # This function only finds the indexes where it contains ALL WORDS specified in "words".
-        for index_array in indexes:
-            for index in index_array:
-                if index not in found and all([index in array for array in indexes]):
-                    found.append(index)
-        return found
+    def tag(self, split_into: int, occurences: int, words: dict) -> [str]:
+        result = []
+        print(len(words))
+        for line in words.values():
+            if len(result) % 100 == 0:
+                print("100 more")
+            split_words = line.split(" ")
+            split = split_into_groups(split_into, split_words)
+            for s in split:
+                if len(s) < split_into or len(self.query(s)) < occurences:
+                    result += ' '.join(s)
+                else:
+                    result += '<tag>' + ' '.join(s) + '</tag>'
+        return result
 
-    # A static method for loading a new invertex index from a file.
+    # Search for words in words_inverted_index.
+    def query(self, words: [str]) -> [int]:
+        indexes = [self.words_inverted_index[word] for word in words if word in self.words_inverted_index]
+        i = 1
+        s1 = set(indexes[0])
+        while i < len(indexes) - 1:
+            s2 = set(indexes[i])
+            s1.intersection_update(s2)
+            i += 1
+        return list(s1)
+
+    # A static method for loading a new inverted index from a file.
     @classmethod
     def load_inverted_index(cls, filepath):
         if not os.path.isfile(filepath):
@@ -81,28 +94,29 @@ def read_lines(filepath: str) -> [str]:
         raise e
 
 
-# Load words which shouldn't be included in the invertex index list from a file.
-def load_stop_words(filepath: str) -> [str]:
-    lines = read_lines(filepath)
-    if len(lines) == 0:
-        raise Exception("The file was empty!")
-    return lines
-
-
 # Load the unedited dataset which should be turned
-def load_dataset(filepath: str) -> dict:
+def load_dataset(filepath: str, stop_words: str) -> dict:
     lines = read_lines(filepath)
+    stop = read_lines(stop_words)
     if len(lines) == 0:
         raise Exception("The file was empty!")
+    if len(stop) == 0:
+        raise Exception("The stop words were empty!")
     result = dict()
     for line in lines:
         # Get the index, and then all remaining.
         index, *words = line.split("\t")
+        words_line = words[0]
+        new_line = []
+        for w in words_line.split(" "):
+            w = w.translate(str.maketrans('', '', string.punctuation))
+            if w not in stop and len(w) is not 0 and not any(character.isdigit() for character in w):
+                new_line.append(w)
         # If our index is not a number
         if not index.isdigit():
             raise Exception("Some line(s) don't have indexes!")
         # Also remove all punctuation from the entries.
-        result[int(index)] = words[0].translate(str.maketrans('', '', string.punctuation))
+        result[int(index)] = ' '.join(new_line)
     return result
 
 
@@ -115,14 +129,25 @@ def get_unique_words(dataset: dict) -> dict:
 
 
 # Combine a dictionary of (int, [str]) to an InvertedIndex.
-def combine_into_list(dataset: dict, stop_words: [str]) -> InvertedIndex:
+def combine_into_list(dataset: dict) -> InvertedIndex:
     if len(dataset) == 0:
         raise Exception("The dataset was empty!")
-    if len(stop_words) == 0:
-        raise Exception("The stop words list was empty!")
     result = defaultdict(list)
     for key, value in dataset.items():
         for word in value:
-            if word not in stop_words:
-                result[word].append(key)
+            result[word].append(key)
     return InvertedIndex(result)
+
+
+# Split a list into groups length of split_to.
+'''
+Example:
+a = range(5)
+split_into_groups(2, a)
+>>> [[0, 1], [2, 3], [4]]
+'''
+
+
+def split_into_groups(split_to, iterable):
+    args = [iter(iterable)] * split_to
+    return list(([item for item in group if item is not None] for group in itertools.zip_longest(*args)))
