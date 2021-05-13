@@ -40,20 +40,18 @@ class InvertedIndex:
         with open(filepath, "w") as file:
             json.dump(result, file, indent=4)
 
-    def tag(self, split_into: int, occurences: int, words: dict) -> [str]:
-        result = []
-        print(len(words))
+    def tag(self, split_into: int, occurences: int, words: dict, file: str, opening_tag: str = "<tag>", closing_tag: str = "</tag>"):
+        f = open(file, mode='w', encoding='utf-8')
         for line in words.values():
-            if len(result) % 100 == 0:
-                print("100 more")
             split_words = line.split(" ")
             split = split_into_groups(split_into, split_words)
             for s in split:
                 if len(s) < split_into or len(self.query(s)) < occurences:
-                    result += ' '.join(s)
+                    f.write(' '.join(s) + ' ')
                 else:
-                    result += '<tag>' + ' '.join(s) + '</tag>'
-        return result
+                    f.write(opening_tag + ' '.join(s) + closing_tag + " ")
+            f.write("\n")
+        f.close()
 
     # Search for words in words_inverted_index.
     def query(self, words: [str]) -> [int]:
@@ -83,27 +81,20 @@ class InvertedIndex:
         return InvertedIndex(new_data)
 
 
-# A helper method for reading a file. (includes stripping and lowering each line)
-def read_lines(filepath: str) -> [str]:
-    try:
-        with open(filepath, encoding="utf-8", mode='r') as f:
-            lines = f.readlines()
-            f.close()
-            return [i.strip().lower() for i in lines]
-    except Exception as e:
-        raise e
-
-
 # Load the unedited dataset which should be turned
 def load_dataset(filepath: str, stop_words: str) -> dict:
-    lines = read_lines(filepath)
-    stop = read_lines(stop_words)
-    if len(lines) == 0:
-        raise Exception("The file was empty!")
+    result = dict()
+
+    stop_words_file = open(stop_words, mode='r', encoding='utf-8')
+    stop = [i.strip().lower() for i in stop_words_file.readlines()]
+    stop_words_file.close()
     if len(stop) == 0:
         raise Exception("The stop words were empty!")
-    result = dict()
-    for line in lines:
+
+    lines_file = open(filepath, mode='r', encoding='utf-8')
+
+    for line in lines_file:
+        line = line.strip().lower()
         # Get the index, and then all remaining.
         index, *words = line.split("\t")
         words_line = words[0]
@@ -117,6 +108,7 @@ def load_dataset(filepath: str, stop_words: str) -> dict:
             raise Exception("Some line(s) don't have indexes!")
         # Also remove all punctuation from the entries.
         result[int(index)] = ' '.join(new_line)
+
     return result
 
 
