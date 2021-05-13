@@ -1,8 +1,3 @@
-"""
-    The test file (pytest) containing ~19 tests.
-    --cov says the tests have 100% coverage, and I don't believe that.
-"""
-
 # Imports
 import os
 import inverted_index
@@ -28,10 +23,9 @@ def create_json_dataset(tmpdir) -> str:
 def make_simple_dataset(tmpdir, create_stop_words) -> inverted_index.InvertedIndex:
     path = tmpdir.join("dataset")
     path.write('1\tone text test\n2\tset red\n3\ttest')
-    dataset = inverted_index.load_dataset(path)
-    stop_words = inverted_index.load_stop_words(filepath=create_stop_words)
+    dataset = inverted_index.load_dataset(path, create_stop_words)
     unique = inverted_index.get_unique_words(dataset)
-    result = inverted_index.combine_into_list(unique, stop_words)
+    result = inverted_index.combine_into_list(unique)
     return result
 
 
@@ -51,18 +45,12 @@ def test_can_use_pytest():
     assert pytest
 
 
-# Check if we can load the the stop words.
-def test_load_stop_words(create_stop_words):
-    correct_result = ['a', 'hi', 'she', 'he', 'they', 'are']
-    assert correct_result == inverted_index.read_lines(filepath=create_stop_words)
-
-
 # Check if we can FAIL loading the dataset.
 def test_fail_load_dataset(tmpdir):
     with pytest.raises(Exception) as e:
         path = tmpdir.join("testdatabase.txt")
         path.write("")
-        inverted_index.load_dataset(path)
+        inverted_index.load_dataset(path, "")
     assert e
 
 
@@ -82,22 +70,6 @@ def test_fail_query(make_simple_dataset):
     assert exception
 
 
-# Check if we can FAIL loading the stop words by using a non-existing file.
-def test_fail_load_stop_words_file(tmpdir):
-    with pytest.raises(Exception) as exception:
-        inverted_index.load_stop_words(tmpdir.join("asasasas"))
-    assert exception
-
-
-# Check if we can FAIL loading the stop words by giving an empty file.
-def test_fail_load_stop_words_empty(tmpdir):
-    with pytest.raises(Exception) as exception:
-        path = tmpdir.join("empty")
-        path.write("")
-        inverted_index.load_stop_words(path)
-    assert exception
-
-
 # Check if we can FAIL loading an invertex index list.
 def test_fail_load_inverted_index(tmpdir):
     non_existing_path = tmpdir.join("snebjgrg")
@@ -109,7 +81,8 @@ def test_fail_load_inverted_index(tmpdir):
 # Check if we can FAIL reading a file.
 def test_fail_file_read(tmpdir):
     with pytest.raises(Exception) as exception:
-        inverted_index.read_lines(tmpdir.join("gibberish"))
+        f = open(tmpdir.join("gibberish"), mode='r')
+        f.read()
     assert exception
 
 
@@ -118,21 +91,14 @@ def test_fail_load_dataset_no_index(tmpdir):
     temp_file = tmpdir.join('dataset')
     temp_file.write('\ttesting hello hello\n2\tworld world hello')
     with pytest.raises(Exception) as exception:
-        inverted_index.load_dataset(temp_file)
-    assert exception
-
-
-# Check if we can FAIL combining a dictionary into an InvertedIndex by not specifying the stop words.
-def test_fail_combine_into_list_stop(make_python_dataset):
-    with pytest.raises(Exception) as exception:
-        inverted_index.combine_into_list(make_python_dataset, [])
+        inverted_index.load_dataset(temp_file, "")
     assert exception
 
 
 # Check if we can FAIL combining a dictionary into an InvertedIndex by not specifying the dataset.
 def test_fail_combine_into_list_dataset():
     with pytest.raises(Exception) as exception:
-        inverted_index.combine_into_list({}, ["test"])
+        inverted_index.combine_into_list({})
     assert exception
 
 
@@ -166,19 +132,19 @@ def test_dump_dict(tmpdir, make_simple_dataset):
 
 
 # Check if we can load an unedited dataset from a file.
-def test_load_dataset(tmpdir):
+def test_load_dataset(tmpdir, create_stop_words):
     temp_file = tmpdir.join('dataset')
     temp_file.write('1\thello\n2\tworld')
     correct_result = {1: 'hello', 2: 'world'}
-    assert correct_result == inverted_index.load_dataset(temp_file)
+    assert correct_result == inverted_index.load_dataset(temp_file, create_stop_words)
 
 
 # Check if we can get the correct unique words from a dictionary of words that COULD repeat.
-def test_get_unique_words(tmpdir):
+def test_get_unique_words(tmpdir, create_stop_words):
     temp_file = tmpdir.join('dataset')
     temp_file.write('1\ttesting hello hello\n2\tworld world hello')
     correct_result = {1: ['hello', 'testing'], 2: ['hello', 'world']}
-    assert correct_result == inverted_index.get_unique_words(inverted_index.load_dataset(temp_file))
+    assert correct_result == inverted_index.get_unique_words(inverted_index.load_dataset(temp_file, create_stop_words))
 
 
 # Check if we can load an InvertexIndex from a file.
